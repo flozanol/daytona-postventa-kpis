@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Papa from 'papaparse';
-import { TrendingUp, TrendingDown, Minus, Calendar, MapPin, Activity, Users, History } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Calendar, MapPin, Activity, Users, History, BarChart2 } from 'lucide-react';
 
 export default function PostventaDashboard() {
   const [data, setData] = useState([]);
@@ -14,14 +14,14 @@ export default function PostventaDashboard() {
   const [selectedAgencia, setSelectedAgencia] = useState('Todas');
   const [selectedCategory, setSelectedCategory] = useState('');
 
-  // Filtros para la Tabla Frente a Frente
+  // Filtros Tablas Inferiores
   const [compAg1, setCompAg1] = useState('');
   const [compAg2, setCompAg2] = useState('');
   const [compAg3, setCompAg3] = useState('Ninguna');
+  const [kpiGrafica, setKpiGrafica] = useState('Venta Total'); // Selector para la gráfica
 
   const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTwcS4mh6qN2rqhcrnuBEssd5GIsEiXAp242OuqK9tuxEZfR_xRRJszCRbiDTUJIzbOwpkJpa4kqI4_/pub?gid=1096001978&single=true&output=csv';
 
-  // Lógica para ordenar los meses cronológicamente (ej: de Ene-25 a Feb-26)
   const mesesOrdenMap = { Ene: '01', Feb: '02', Mar: '03', Abr: '04', May: '05', Jun: '06', Jul: '07', Ago: '08', Sep: '09', Oct: '10', Nov: '11', Dic: '12' };
 
   const parseMesToSortable = (mesStr) => {
@@ -44,11 +44,16 @@ export default function PostventaDashboard() {
           const catDisp = [...new Set(cleanData.map(d => d.Tipo))];
           const agenciasDisp = [...new Set(cleanData.map(d => d.Agencia))].sort();
 
-          // Ordenar meses para seleccionar el más reciente por defecto
-          const sortedMeses = mesesDisp.sort((a, b) => parseMesToSortable(a).localeCompare(parseMesToSortable(b)));
+          // 1. Filtrar solo los meses que realmente tienen algún valor mayor a 0 (Evita Dic-26 vacío)
+          const mesesConDatos = mesesDisp.filter(m => cleanData.some(d => d.Mes === m && Number(d.Valor) > 0));
+          const sortedMesesReales = mesesConDatos.sort((a, b) => parseMesToSortable(a).localeCompare(parseMesToSortable(b)));
 
-          setMesBase(sortedMeses[sortedMeses.length - 1]);
-          setMesComparacion(sortedMeses.length > 1 ? sortedMeses[sortedMeses.length - 2] : sortedMeses[sortedMeses.length - 1]);
+          // Seleccionamos el mes más reciente con datos reales
+          const mesActual = sortedMesesReales.length > 0 ? sortedMesesReales[sortedMesesReales.length - 1] : mesesDisp[0];
+          const mesAnt = sortedMesesReales.length > 1 ? sortedMesesReales[sortedMesesReales.length - 2] : mesActual;
+
+          setMesBase(mesActual);
+          setMesComparacion(mesAnt);
           setSelectedCategory(catDisp[0]);
 
           if (agenciasDisp.length > 0) {
@@ -96,31 +101,36 @@ export default function PostventaDashboard() {
   if (loading) return <div className="flex h-screen flex-col items-center justify-center bg-[#003366]"><img src="https://grupodaytona.com/_next/image?url=https%3A%2F%2Fapi.grupodaytona.com%2Ffiles%2Fimages%2Ffull-xzLxpZqXUE-1728519042236.png&w=384&q=75" alt="Daytona" className="w-48 mb-6 animate-pulse" /><div className="text-white/70 font-bold text-sm tracking-widest">CARGANDO...</div></div>;
 
   const agencias = [...new Set(data.map(d => d.Agencia))].sort();
-  // Meses ordenados cronológicamente inverso para los selectores (más nuevo arriba)
-  const mesesDispRaw = [...new Set(data.map(d => d.Mes))];
-  const mesesSelectores = mesesDispRaw.sort((a, b) => parseMesToSortable(b).localeCompare(parseMesToSortable(a)));
+
+  // Limpiamos los selectores para que no muestren meses vacíos del futuro
+  const mesesConDatosGlobal = [...new Set(data.filter(d => Number(d.Valor) > 0).map(d => d.Mes))];
+  const mesesSelectores = mesesConDatosGlobal.sort((a, b) => parseMesToSortable(b).localeCompare(parseMesToSortable(a)));
 
   const categorias = [...new Set(data.map(d => d.Tipo))];
   const todosLosKPIs = [...new Set(data.map(d => d.KPI))];
 
-  // Lógica para la Tabla Histórica Final
+  // Lógica para la Tabla Histórica y la Gráfica (Filtra hasta el mes seleccionado)
   const getMesesHistoricosArr = () => {
-    const sortedAll = mesesDispRaw.sort((a, b) => parseMesToSortable(a).localeCompare(parseMesToSortable(b)));
+    const sortedAll = mesesConDatosGlobal.sort((a, b) => parseMesToSortable(a).localeCompare(parseMesToSortable(b)));
     const sortableSelected = parseMesToSortable(mesBase);
-    // Filtrar desde Ene-25 hasta el mes seleccionado inclusive
     return sortedAll.filter(m => parseMesToSortable(m) <= sortableSelected);
   };
 
   const mesesHistoricosArr = getMesesHistoricosArr();
   const agenciaHistoricaNombre = selectedAgencia === 'Todas' ? 'Consolidado Grupo' : selectedAgencia;
 
+  // Datos para la Gráfica
+  const chartData = mesesHistoricosArr.map(m => ({
+    mes: m,
+    valor: getVal(m, selectedCategory, selectedAgencia, kpiGrafica)
+  }));
+  const maxChartVal = Math.max(...chartData.map(d => d.valor), 1); // Evita división por cero
+
   return (
     <div className="flex flex-col xl:flex-row min-h-screen bg-[#F1F5F9] font-sans text-gray-800 antialiased">
 
       {/* SIDEBAR */}
       <div className="w-full xl:w-72 bg-white border-r border-gray-200 shadow-sm flex flex-col z-10 shrink-0">
-
-        {/* ENCABEZADO CON FONDO AZUL PARA EL LOGO */}
         <div className="p-8 border-b border-[#002244] flex flex-col items-center justify-center bg-[#003366] shadow-inner">
           <img src="https://grupodaytona.com/_next/image?url=https%3A%2F%2Fapi.grupodaytona.com%2Ffiles%2Fimages%2Ffull-xzLxpZqXUE-1728519042236.png&w=384&q=75" alt="Grupo Daytona" className="w-40 mb-2" />
           <p className="text-[10px] font-black text-white/70 uppercase tracking-[0.3em]">Business Intelligence</p>
@@ -131,7 +141,7 @@ export default function PostventaDashboard() {
             <label className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase mb-3 tracking-wider"><Calendar size={14} className="text-[#003366]" /> 1. Mes de Análisis</label>
             <select className="w-full p-3 bg-white border border-gray-300 rounded-lg text-sm font-bold text-[#003366] shadow-sm outline-none hover:border-[#003366] transition-colors cursor-pointer"
               value={mesBase} onChange={e => setMesBase(e.target.value)}>
-              {mesesSelectores.map(m => <option key={m} value={m}>{m}</option>)}
+              {mesSelectores.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
 
@@ -281,20 +291,48 @@ export default function PostventaDashboard() {
             </div>
           </div>
 
-          {/* NUEVA TABLA 3: TENDENCIA HISTÓRICA DETALLADA */}
+          {/* NUEVA SECCIÓN: GRÁFICA + TABLA HISTÓRICA DETALLADA */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="p-6 border-b border-gray-100 bg-white">
-              <h2 className="text-xl font-black text-[#003366] flex items-center gap-2"><History size={20} /> Tendencia Histórica Detallada: {agenciaHistoricaNombre}</h2>
-              <p className="text-sm text-gray-500 mt-1">Evolución mensual desde Enero 2025 hasta {mesBase} (solo canal {selectedCategory}).</p>
+
+            <div className="p-6 border-b border-gray-100 bg-white flex flex-col xl:flex-row justify-between xl:items-center gap-6">
+              <div>
+                <h2 className="text-xl font-black text-[#003366] flex items-center gap-2"><History size={20} /> Tendencia Histórica: {agenciaHistoricaNombre}</h2>
+                <p className="text-sm text-gray-500 mt-1">Evolución desde Enero 2025 hasta {mesBase} (Canal: {selectedCategory}).</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1"><BarChart2 size={14} /> Graficar:</span>
+                <select className="p-2.5 bg-[#F8FAFC] border border-gray-200 rounded-lg text-sm font-bold text-[#003366] outline-none shadow-sm cursor-pointer"
+                  value={kpiGrafica} onChange={e => setKpiGrafica(e.target.value)}>
+                  {todosLosKPIs.map(k => <option key={k} value={k}>{k}</option>)}
+                </select>
+              </div>
             </div>
 
-            {/* Contenedor con scroll horizontal para soportar muchos meses */}
+            {/* LA GRÁFICA (Puro Tailwind, sin librerías) */}
+            <div className="p-8 border-b border-gray-100 bg-[#F8FAFC]/50">
+              <div className="h-48 flex items-end gap-2 md:gap-4">
+                {chartData.map((d, i) => (
+                  <div key={i} className="flex-1 flex flex-col items-center group relative h-full justify-end">
+                    {/* Tooltip flotante al pasar el mouse */}
+                    <div className="opacity-0 group-hover:opacity-100 absolute -top-12 bg-[#002244] text-white text-xs font-bold py-1.5 px-3 rounded shadow-lg pointer-events-none transition-all whitespace-nowrap z-20">
+                      {d.mes}: {formatMoney(d.valor, kpiGrafica)}
+                    </div>
+                    {/* Barra */}
+                    <div className="w-full bg-[#93C5FD] group-hover:bg-[#003366] transition-colors rounded-t-md relative"
+                      style={{ height: `${Math.max((d.valor / maxChartVal) * 100, 1)}%` }}>
+                    </div>
+                    {/* Etiqueta del mes (rotada para móviles, recta para PC) */}
+                    <span className="text-[10px] sm:text-xs font-bold text-gray-400 mt-3 whitespace-nowrap">{d.mes}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* LA TABLA HISTÓRICA */}
             <div className="overflow-x-auto">
-              {/* min-w-[1500px] asegura que haya espacio suficiente para las columnas sin encimarse */}
               <table className="w-full text-left table-fixed min-w-[1500px]">
                 <thead>
                   <tr className="bg-[#F8FAFC] text-gray-500 text-xs uppercase tracking-wider">
-                    {/* sticky left-0 y z-1 para dejar fija la columna de nombres de KPI al scrollear */}
                     <th className="p-5 font-bold border-b border-gray-100 w-64 sticky left-0 bg-[#F8FAFC] z-10 shadow-[2px_0_5px_0_rgba(0,0,0,0.05)]">Indicador (KPI)</th>
                     {mesesHistoricosArr.map(m => (
                       <th key={m} className="p-5 font-bold border-b border-gray-100 text-right w-36">{m}</th>
@@ -303,18 +341,16 @@ export default function PostventaDashboard() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {todosLosKPIs.map(kpi => {
-                    // Ocultar fila si no hay datos en todo el histórico para este KPI
                     const hasDataInHistory = mesesHistoricosArr.some(m => getVal(m, selectedCategory, selectedAgencia, kpi) > 0);
                     if (!hasDataInHistory) return null;
 
                     return (
                       <tr key={kpi} className="hover:bg-blue-50/40 group transition-colors">
-                        {/* sticky left-0 bg-white para la columna fija en el cuerpo de la tabla */}
                         <td className="p-5 font-bold text-gray-700 bg-white sticky left-0 z-1 shadow-[2px_0_5px_0_rgba(0,0,0,0.05)] group-hover:bg-[#EBF5FF] transition-colors">{kpi}</td>
                         {mesesHistoricosArr.map(m => {
                           const val = getVal(m, selectedCategory, selectedAgencia, kpi);
                           return (
-                            <td key={m} className="p-5 text-right font-medium text-gray-700">
+                            <td key={m} className="p-5 text-right font-medium text-gray-600 group-hover:text-[#003366]">
                               {formatMoney(val, kpi)}
                             </td>
                           );
