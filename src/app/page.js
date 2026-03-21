@@ -2,18 +2,22 @@
 
 import { useState, useEffect } from 'react';
 import Papa from 'papaparse';
-import { TrendingUp, TrendingDown, Minus, Calendar, MapPin, Activity } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Calendar, MapPin, Activity, Users } from 'lucide-react';
 
 export default function PostventaDashboard() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Filtros
+  // Filtros Globales
   const [mesBase, setMesBase] = useState('');
   const [mesComparacion, setMesComparacion] = useState('');
   const [selectedAgencia, setSelectedAgencia] = useState('Todas');
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [kpiRanking, setKpiRanking] = useState('Venta Total');
+
+  // Filtros para la Tabla Frente a Frente
+  const [compAg1, setCompAg1] = useState('');
+  const [compAg2, setCompAg2] = useState('');
+  const [compAg3, setCompAg3] = useState('');
 
   const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTwcS4mh6qN2rqhcrnuBEssd5GIsEiXAp242OuqK9tuxEZfR_xRRJszCRbiDTUJIzbOwpkJpa4kqI4_/pub?gid=1096001978&single=true&output=csv';
 
@@ -29,10 +33,18 @@ export default function PostventaDashboard() {
         if (cleanData.length > 0) {
           const mesesDisp = [...new Set(cleanData.map(d => d.Mes))];
           const catDisp = [...new Set(cleanData.map(d => d.Tipo))];
+          const agenciasDisp = [...new Set(cleanData.map(d => d.Agencia))].sort();
 
           setMesBase(mesesDisp[mesesDisp.length - 1]);
           setMesComparacion(mesesDisp.length > 1 ? mesesDisp[mesesDisp.length - 2] : mesesDisp[mesesDisp.length - 1]);
           setSelectedCategory(catDisp[0]);
+
+          // Asignar agencias iniciales para el Frente a Frente
+          if (agenciasDisp.length > 0) {
+            setCompAg1(agenciasDisp[0]);
+            setCompAg2(agenciasDisp[1] || agenciasDisp[0]);
+            setCompAg3(agenciasDisp[2] || agenciasDisp[0]);
+          }
         }
         setLoading(false);
       }
@@ -51,30 +63,18 @@ export default function PostventaDashboard() {
     return ((actual - anterior) / anterior) * 100;
   };
 
-  // --- AQUÍ ESTÁ LA MAGIA CORREGIDA ---
   const formatMoney = (val, kpiName) => {
     const nameLower = String(kpiName).toLowerCase();
-
-    // 1. Si es porcentaje explícito
     if (nameLower.includes('%')) return val.toFixed(1) + '%';
 
-    // 2. Palabras clave que NO son dinero
-    const keywordsGeneral = [
-      'ordenes', 'órdenes', 'unidades', 'facturadas',
-      'permanencia', 'retención', 'retencion'
-    ];
-
+    const keywordsGeneral = ['ordenes', 'órdenes', 'unidades', 'facturadas', 'permanencia', 'retención', 'retencion'];
     const isGeneralNumber = keywordsGeneral.some(kw => nameLower.includes(kw));
 
     if (isGeneralNumber) {
-      // Si tiene decimales (como Permanencia Promedio), le dejamos 1 decimal, si es entero, lo dejamos cerrado
       return Number.isInteger(val) ? val.toLocaleString('es-MX') : val.toLocaleString('es-MX', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
     }
-
-    // 3. Todo lo demás es Dinero
     return '$' + val.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   };
-  // -------------------------------------
 
   const DeltaBadge = ({ value }) => {
     if (value > 0) return <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-green-100 text-green-700 text-xs font-bold"><TrendingUp size={12} /> +{value.toFixed(1)}%</span>;
@@ -117,7 +117,7 @@ export default function PostventaDashboard() {
           </div>
 
           <div>
-            <label className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase mb-2"><MapPin size={14} /> 3. Agencia</label>
+            <label className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase mb-2"><MapPin size={14} /> 3. Agencia Principal</label>
             <select className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-[#003366] outline-none"
               value={selectedAgencia} onChange={e => setSelectedAgencia(e.target.value)}>
               <option value="Todas">Consolidado (Todas)</option>
@@ -145,10 +145,10 @@ export default function PostventaDashboard() {
 
         <div className="space-y-8">
 
-          {/* TABLA 1: COMPARATIVA TEMPORAL */}
+          {/* TABLA 1: COMPARATIVA TEMPORAL (Misma Agencia) */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="p-5 border-b border-gray-100">
-              <h2 className="text-lg font-bold text-[#003366] flex items-center gap-2"><Activity size={18} /> Análisis Detallado: {selectedAgencia}</h2>
+            <div className="p-5 border-b border-gray-100 bg-[#003366]/5">
+              <h2 className="text-lg font-bold text-[#003366] flex items-center gap-2"><Activity size={18} /> Análisis en el Tiempo: {selectedAgencia}</h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
@@ -156,7 +156,7 @@ export default function PostventaDashboard() {
                   <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
                     <th className="p-4 font-bold border-b border-gray-100">Indicador (KPI)</th>
                     <th className="p-4 font-bold border-b border-gray-100 text-right">Actual ({mesBase})</th>
-                    <th className="p-4 font-bold border-b border-gray-100 text-right">Comparativa ({mesComparacion})</th>
+                    <th className="p-4 font-bold border-b border-gray-100 text-right">Anterior ({mesComparacion})</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -183,40 +183,62 @@ export default function PostventaDashboard() {
             </div>
           </div>
 
-          {/* TABLA 2: RANKING AGENCIAS */}
+          {/* TABLA 2: FRENTE A FRENTE (Mismo Mes, Diferentes Agencias) */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-              <h2 className="text-lg font-bold text-[#003366]">Ranking Comparativo entre Agencias</h2>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-gray-500 uppercase">Analizar:</span>
-                <select className="p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-[#003366] outline-none"
-                  value={kpiRanking} onChange={e => setKpiRanking(e.target.value)}>
-                  {todosLosKPIs.map(k => <option key={k} value={k}>{k}</option>)}
+            <div className="p-5 border-b border-gray-100 bg-[#003366]/5 flex flex-col xl:flex-row justify-between xl:items-center gap-4">
+              <h2 className="text-lg font-bold text-[#003366] flex items-center gap-2 whitespace-nowrap"><Users size={18} /> Frente a Frente ({mesBase})</h2>
+
+              {/* Filtros para elegir a los contrincantes */}
+              <div className="flex flex-wrap items-center gap-2">
+                <select className="p-2 bg-white border border-gray-300 rounded-lg text-sm font-bold text-[#003366] outline-none" value={compAg1} onChange={e => setCompAg1(e.target.value)}>
+                  <option value="Todas">Consolidado</option>
+                  {agencias.map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
+                <span className="text-gray-400 font-bold text-xs uppercase">vs</span>
+                <select className="p-2 bg-white border border-gray-300 rounded-lg text-sm font-bold text-[#003366] outline-none" value={compAg2} onChange={e => setCompAg2(e.target.value)}>
+                  <option value="Todas">Consolidado</option>
+                  {agencias.map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
+                <span className="text-gray-400 font-bold text-xs uppercase">vs</span>
+                <select className="p-2 bg-white border border-gray-300 rounded-lg text-sm font-bold text-[#003366] outline-none" value={compAg3} onChange={e => setCompAg3(e.target.value)}>
+                  <option value="Todas">Consolidado</option>
+                  {agencias.map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
               </div>
             </div>
+
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
                   <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
-                    <th className="p-4 font-bold border-b border-gray-100">Agencia</th>
-                    <th className="p-4 font-bold border-b border-gray-100 text-right">Resultado ({mesBase})</th>
-                    <th className="p-4 font-bold border-b border-gray-100 text-right">Participación (Share)</th>
+                    <th className="p-4 font-bold border-b border-gray-100">Indicador (KPI)</th>
+                    <th className="p-4 font-bold border-b border-gray-100 text-right">{compAg1}</th>
+                    <th className="p-4 font-bold border-b border-gray-100 text-right">{compAg2}</th>
+                    <th className="p-4 font-bold border-b border-gray-100 text-right">{compAg3}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {agencias.map(ag => {
-                    const valAg = getVal(mesBase, selectedCategory, ag, kpiRanking);
-                    const valTot = getVal(mesBase, selectedCategory, 'Todas', kpiRanking);
-                    const share = valTot > 0 ? (valAg / valTot) * 100 : 0;
-                    if (valAg === 0) return null;
+                  {todosLosKPIs.map(kpi => {
+                    const val1 = getVal(mesBase, selectedCategory, compAg1, kpi);
+                    const val2 = getVal(mesBase, selectedCategory, compAg2, kpi);
+                    const val3 = getVal(mesBase, selectedCategory, compAg3, kpi);
+
+                    if (val1 === 0 && val2 === 0 && val3 === 0) return null;
+
+                    // Encontrar el ganador absoluto de esa fila para pintarlo de verde
+                    const maxVal = Math.max(val1, val2, val3);
 
                     return (
-                      <tr key={ag} className="hover:bg-blue-50/50">
-                        <td className="p-4 font-bold text-gray-700">{ag}</td>
-                        <td className="p-4 text-right font-black text-gray-800 text-lg">{formatMoney(valAg, kpiRanking)}</td>
-                        <td className="p-4 text-right">
-                          <span className="bg-blue-100 text-[#003366] font-bold px-3 py-1 rounded text-sm">{share.toFixed(1)}%</span>
+                      <tr key={kpi} className="hover:bg-blue-50/50">
+                        <td className="p-4 font-bold text-gray-700">{kpi}</td>
+                        <td className={`p-4 text-right font-black text-lg ${val1 === maxVal && val1 > 0 ? 'text-green-600' : 'text-gray-800'}`}>
+                          {formatMoney(val1, kpi)}
+                        </td>
+                        <td className={`p-4 text-right font-black text-lg ${val2 === maxVal && val2 > 0 ? 'text-green-600' : 'text-gray-800'}`}>
+                          {formatMoney(val2, kpi)}
+                        </td>
+                        <td className={`p-4 text-right font-black text-lg ${val3 === maxVal && val3 > 0 ? 'text-green-600' : 'text-gray-800'}`}>
+                          {formatMoney(val3, kpi)}
                         </td>
                       </tr>
                     );
