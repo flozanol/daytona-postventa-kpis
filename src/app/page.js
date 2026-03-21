@@ -2,8 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import Papa from 'papaparse';
-import { Card, Title, Text, Metric, Grid, Table, TableHead, TableRow, TableHeaderCell, TableBody, TableCell, BadgeDelta, TabGroup, TabList, Tab, Select, SelectItem, Flex, AreaChart } from "@tremor/react";
-import { ArrowLeftRight, TrendingUp, DollarSign } from 'lucide-react';
+import {
+  Card, Title, Text, Metric, Grid, Table, TableHead, TableRow,
+  TableHeaderCell, TableBody, TableCell, BadgeDelta, TabGroup,
+  TabList, Tab, Select, SelectItem, Flex, AreaChart
+} from "@tremor/react";
 
 export default function PostventaDashboard() {
   const [data, setData] = useState([]);
@@ -19,171 +22,125 @@ export default function PostventaDashboard() {
       download: true,
       header: true,
       dynamicTyping: true,
+      skipEmptyLines: true,
       complete: (results) => {
-        // Limpiamos datos vacíos y formateamos
-        const cleanedData = results.data.filter(d => d.Agencia && d.Mes && d.KPI);
-        setData(cleanedData);
-        setLoading(false);
-      },
-      error: (error) => {
-        console.error('Error parseando CSV:', error);
+        setData(results.data.filter(d => d.Agencia));
         setLoading(false);
       }
     });
   }, []);
 
-  // --- LÓGICA DE DATOS (El 'Cerebro' del Dashboard) ---
-  const getValuesForPeriod = (monthStr, category, agencia, kpiName) => {
-    let filtered = data.filter(d => d.Mes === monthStr && d.Tipo === category && d.KPI === kpiName);
-    if (agencia !== 'Todas') {
-      filtered = filtered.filter(d => d.Agencia === agencia);
-    }
-    // Sumamos por si hay múltiples entradas
-    return filtered.reduce((sum, item) => sum + (item.Valor || 0), 0);
+  const getVal = (m, c, a, k) => {
+    let f = data.filter(d => d.Mes === m && d.Tipo === c && d.KPI === k);
+    if (a !== 'Todas') f = f.filter(d => d.Agencia === a);
+    return f.reduce((s, i) => s + (Number(i.Valor) || 0), 0);
   };
 
-  const calculateDelta = (current, previous) => {
-    if (!previous || previous === 0) return 0;
-    return ((current - previous) / previous) * 100;
-  };
+  if (loading) return <div className="p-10 font-sans text-center">Cargando Dashboard Daytona...</div>;
 
-  // Definimos meses para comparar (ej: Feb-26 -> Feb-25)
-  const getPrevYearMonth = (monthStr) => {
-    const [mes, año] = monthStr.split('-');
-    const prevAño = parseInt(año) - 1;
-    return `${mes}-${prevAño}`;
-  };
-
-  if (loading) return <div className="p-10 text-center">Cargando KPIs de Grupo Daytona...</div>;
-  if (data.length === 0) return <div className="p-10 text-center text-red-500">No se encontraron datos en el CSV. Revisa la publicación de Google Sheets.</div>;
-
-  const prevYearMonth = getPrevYearMonth(selectedMonth);
-
-  // --- DATOS PARA LAS TARJETAS PRINCIPALES ---
-  const kpis = [
-    { name: 'Venta Total', icon: DollarSign, unit: '$' },
-    { name: 'Utilidad Bruta', icon: TrendingUp, unit: '$' },
-    { name: 'Ticket Promedio', icon: ArrowLeftRight, unit: '$' }
-  ];
-
-  // --- DATOS PARA LA TABLA MAESTRA ---
   const agencias = [...new Set(data.map(d => d.Agencia))].sort();
-  const tableData = agencias.map(agencia => {
-    const currentVenta = getValuesForPeriod(selectedMonth, selectedCategory, agencia, 'Venta Total');
-    const prevYearVenta = getValuesForPeriod(prevYearMonth, selectedCategory, agencia, 'Venta Total');
-    return {
-      name: agencia,
-      current: currentVenta,
-      prevYear: prevYearVenta,
-      delta: calculateDelta(currentVenta, prevYearVenta)
-    };
-  });
-
-  // --- DATOS PARA LA GRÁFICA DE TENDENCIA ---
-  const monthsTrend = [...new Set(data.filter(d => d.Tipo === selectedCategory && d.KPI === 'Venta Total').map(d => d.Mes))];
-  const trendData = monthsTrend.map(month => ({
-    Mes: month,
-    "Venta Total": getValuesForPeriod(month, selectedCategory, 'Todas', 'Venta Total')
-  }));
-
-  const categories = ['Normal', 'Garantía', 'H&P', 'Seguros'];
-  const months = [...new Set(data.map(d => d.Mes))].reverse(); // Feb-26 primero
+  const meses = [...new Set(data.map(d => d.Mes))].reverse();
+  const categorias = ['Normal', 'Garantía', 'H&P', 'Seguros'];
+  const prevMonth = "Ene-26"; // Lógica simplificada para probar
+  const prevYear = "Feb-25";
 
   return (
-    <main className="p-6 md:p-10 bg-slate-50 min-h-screen">
-      {/* CABECERA Y FILTROS */}
-      <Flex className="border-b border-slate-200 pb-6 mb-8 gap-4 flex-col md:flex-row items-start md:items-center">
+    <div className="min-h-screen bg-gray-50 p-4 md:p-10 font-sans">
+      {/* Header Estilo Profesional */}
+      <div className="mb-8 border-b border-gray-200 pb-6 flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
-          <Title className="text-3xl font-bold text-slate-900">KPIs Postventa - Grupo Daytona</Title>
-          <Text className="text-slate-600 mt-1">Análisis de Desempeño y Comparativa Temporal</Text>
+          <h1 className="text-3xl font-bold text-[#003366]">Daytona Postventa</h1>
+          <p className="text-gray-500">Panel de Control de KPIs e Indicadores</p>
         </div>
-        <Flex className="gap-3 w-full md:w-auto">
-          <Select value={selectedMonth} onValueChange={setSelectedMonth} className="max-w-[150px]">
-            {months.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+        <div className="flex gap-2">
+          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+            {meses.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
           </Select>
-          <Select value={selectedAgencia} onValueChange={setSelectedAgencia} className="max-w-[200px]">
-            <SelectItem value="Todas">Todas las Agencias</SelectItem>
+          <Select value={selectedAgencia} onValueChange={setSelectedAgencia}>
+            <SelectItem value="Todas">Grupales</SelectItem>
             {agencias.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
           </Select>
-        </Flex>
-      </Flex>
+        </div>
+      </div>
 
-      {/* SELECTOR DE CATEGORÍA (TABS) */}
-      <TabGroup index={categories.indexOf(selectedCategory)} onIndexChange={(i) => setSelectedCategory(categories[i])} className="mb-8">
-        <TabList variant="line">
-          {categories.map(cat => <Tab key={cat}>{cat}</Tab>)}
+      <TabGroup className="mb-8" index={categorias.indexOf(selectedCategory)} onIndexChange={i => setSelectedCategory(categorias[i])}>
+        <TabList variant="solid">
+          {categorias.map(c => <Tab key={c}>{c}</Tab>)}
         </TabList>
       </TabGroup>
 
-      {/* TARJETAS PRINCIPALES (KPI CARDS) */}
+      {/* KPI Cards */}
       <Grid numItemsMd={3} className="gap-6 mb-8">
-        {kpis.map((kpi) => {
-          const currentValue = getValuesForPeriod(selectedMonth, selectedCategory, selectedAgencia, kpi.name);
-          const prevYearValue = getValuesForPeriod(prevYearMonth, selectedCategory, selectedAgencia, kpi.name);
-          const delta = calculateDelta(currentValue, prevYearValue);
-
+        {['Venta Total', 'Utilidad Bruta', 'Ticket Promedio'].map(kpi => {
+          const val = getVal(selectedMonth, selectedCategory, selectedAgencia, kpi);
+          const old = getVal(prevYear, selectedCategory, selectedAgencia, kpi);
+          const delta = old ? ((val - old) / old) * 100 : 0;
           return (
-            <Card key={kpi.name} decoration="top" decorationColor="blue">
-              <Flex alignItems="start">
-                <div>
-                  <Text className="font-medium text-slate-600">{kpi.name} ({selectedCategory})</Text>
-                  <Metric className="font-bold text-3xl text-daytonaBlue">
-                    {kpi.unit}{currentValue.toLocaleString('es-MX')}
-                  </Metric>
-                </div>
+            <Card key={kpi} decoration="top" decorationColor="blue">
+              <Text>{kpi}</Text>
+              <Flex justifyContent="start" alignItems="baseline" className="gap-2">
+                <Metric className="text-[#003366] font-bold">${val.toLocaleString()}</Metric>
                 <BadgeDelta deltaType={delta >= 0 ? "moderateIncrease" : "moderateDecrease"}>
-                  {delta.toFixed(1)}% vs {prevYearMonth}
+                  {delta.toFixed(1)}%
                 </BadgeDelta>
               </Flex>
+              <Text className="mt-2 text-xs">vs mismo mes año anterior</Text>
             </Card>
           );
         })}
       </Grid>
 
       <Grid numItemsLg={3} className="gap-6">
-        {/* TABLA MAESTRA DE AGENCIAS */}
+        {/* Tabla Comparativa */}
         <Card className="col-span-2">
-          <Title>Comparativo Inter-Agencias: {selectedCategory}</Title>
-          <Table className="mt-5">
+          <Title>Comparativo por Agencia - {selectedCategory}</Title>
+          <Table className="mt-4">
             <TableHead>
               <TableRow>
                 <TableHeaderCell>Agencia</TableHeaderCell>
-                <TableHeaderCell textAlignment="right">{selectedMonth}</TableHeaderCell>
-                <TableHeaderCell textAlignment="right">{prevYearMonth} (Año Ant.)</TableHeaderCell>
-                <TableHeaderCell textAlignment="right">Variación Anual</TableHeaderCell>
+                <TableHeaderCell textAlignment="right">Valor {selectedMonth}</TableHeaderCell>
+                <TableHeaderCell textAlignment="right">vs Mes Ant.</TableHeaderCell>
+                <TableHeaderCell textAlignment="right">vs Año Ant.</TableHeaderCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {tableData.map((item) => (
-                <TableRow key={item.name}>
-                  <TableCell className="font-medium text-slate-900">{item.name}</TableCell>
-                  <TableCell textAlignment="right">${item.current.toLocaleString('es-MX')}</TableCell>
-                  <TableCell textAlignment="right">${item.prevYear.toLocaleString('es-MX')}</TableCell>
-                  <TableCell textAlignment="right">
-                    <BadgeDelta deltaType={item.delta >= 0 ? "moderateIncrease" : "moderateDecrease"}>
-                      {item.delta.toFixed(1)}%
-                    </BadgeDelta>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {agencias.map(a => {
+                const vActual = getVal(selectedMonth, selectedCategory, a, 'Venta Total');
+                const vMesAnt = getVal(prevMonth, selectedCategory, a, 'Venta Total');
+                const vAñoAnt = getVal(prevYear, selectedCategory, a, 'Venta Total');
+                const dMes = vMesAnt ? ((vActual - vMesAnt) / vMesAnt) * 100 : 0;
+                const dAño = vAñoAnt ? ((vActual - vAñoAnt) / vAñoAnt) * 100 : 0;
+
+                return (
+                  <TableRow key={a}>
+                    <TableCell className="font-medium">{a}</TableCell>
+                    <TableCell textAlignment="right">${vActual.toLocaleString()}</TableCell>
+                    <TableCell textAlignment="right">
+                      <BadgeDelta deltaType={dMes >= 0 ? "subtleIncrease" : "subtleDecrease"}>{dMes.toFixed(1)}%</BadgeDelta>
+                    </TableCell>
+                    <TableCell textAlignment="right">
+                      <BadgeDelta deltaType={dAño >= 0 ? "subtleIncrease" : "subtleDecrease"}>{dAño.toFixed(1)}%</BadgeDelta>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </Card>
 
-        {/* GRÁFICA DE TENDENCIA */}
+        {/* Gráfica */}
         <Card>
-          <Title>Tendencia Histórica: Venta Total ({selectedCategory})</Title>
+          <Title>Tendencia Mensual</Title>
           <AreaChart
-            className="h-72 mt-6"
-            data={trendData}
+            className="h-64 mt-4"
+            data={meses.slice().reverse().map(m => ({ Mes: m, Venta: getVal(m, selectedCategory, selectedAgencia, 'Venta Total') }))}
             index="Mes"
-            categories={["Venta Total"]}
+            categories={["Venta"]}
             colors={["blue"]}
-            valueFormatter={(number) => `$${number.toLocaleString('es-MX')}`}
             showLegend={false}
           />
         </Card>
       </Grid>
-    </main>
+    </div>
   );
 }
