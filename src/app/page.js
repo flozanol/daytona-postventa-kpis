@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Papa from 'papaparse';
-import { TrendingUp, TrendingDown, Minus, Calendar, MapPin, Activity, Users, History, BarChart2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Calendar, MapPin, Activity, Users, History, LineChart } from 'lucide-react';
 
 export default function PostventaDashboard() {
   const [data, setData] = useState([]);
@@ -22,7 +22,7 @@ export default function PostventaDashboard() {
 
   const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTwcS4mh6qN2rqhcrnuBEssd5GIsEiXAp242OuqK9tuxEZfR_xRRJszCRbiDTUJIzbOwpkJpa4kqI4_/pub?gid=1096001978&single=true&output=csv';
 
-  // Lógica blindada para ordenar meses (ignora espacios o si dice "Enero" completo)
+  // Lógica SUPER blindada para ordenar meses (ignora espacios, guiones o si dice "Enero" completo)
   const getMonthNumber = (m) => {
     const lower = String(m).trim().toLowerCase();
     if (lower.startsWith('ene')) return '01';
@@ -41,8 +41,16 @@ export default function PostventaDashboard() {
   };
 
   const parseMesToSortable = (mesStr) => {
-    if (!mesStr || !mesStr.includes('-')) return '9999-99';
-    const [mmm, yy] = mesStr.split('-');
+    if (!mesStr) return '9999-99';
+    // Reemplaza cualquier espacio vacío por un guion (ej. "Enero 2025" -> "Enero-2025")
+    const normalized = String(mesStr).trim().replace(/\s+/g, '-');
+    if (!normalized.includes('-')) return '9999-99';
+
+    const parts = normalized.split('-');
+    const mmm = parts[0];
+    const yy = parts[parts.length - 1]; // Toma el último valor por si hay varios guiones
+    if (!yy) return '9999-99';
+
     const year = yy.length === 2 ? `20${yy}` : yy;
     return `${year}-${getMonthNumber(mmm)}`;
   };
@@ -107,18 +115,16 @@ export default function PostventaDashboard() {
     return '$' + val.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   };
 
-  // --- LÓGICA INVERSA IMPLEMENTADA AQUÍ ---
+  // Lógica inversa para Permanencia Promedio (Menor es mejor = Verde)
   const DeltaBadge = ({ value, kpiName }) => {
     const isReverseLogic = String(kpiName).toLowerCase().includes('permanencia');
 
     if (value > 0) {
-      // Si sube y es Permanencia, es malo (rojo). Si es otro KPI, es bueno (verde).
       return isReverseLogic
         ? <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-red-100 text-red-700 text-xs font-bold"><TrendingUp size={12} /> +{value.toFixed(1)}%</span>
         : <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-green-100 text-green-700 text-xs font-bold"><TrendingUp size={12} /> +{value.toFixed(1)}%</span>;
     }
     if (value < 0) {
-      // Si baja y es Permanencia, es bueno (verde). Si es otro KPI, es malo (rojo).
       return isReverseLogic
         ? <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-green-100 text-green-700 text-xs font-bold"><TrendingDown size={12} /> {value.toFixed(1)}%</span>
         : <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-red-100 text-red-700 text-xs font-bold"><TrendingDown size={12} /> {value.toFixed(1)}%</span>;
@@ -149,6 +155,7 @@ export default function PostventaDashboard() {
     valor: getVal(m, selectedCategory, selectedAgencia, kpiGrafica)
   }));
 
+  // Protegemos las matemáticas de la Gráfica para que no rompa la página si no hay datos
   const n = chartData.length;
   let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
   chartData.forEach((d, i) => {
@@ -157,11 +164,11 @@ export default function PostventaDashboard() {
     sumXY += i * d.valor;
     sumXX += i * i;
   });
-  const slope = n > 1 ? (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX) : 0;
+  const slope = n > 1 && (n * sumXX - sumX * sumX) !== 0 ? (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX) : 0;
   const intercept = n > 0 ? (sumY - slope * sumX) / n : 0;
 
-  const rawMax = Math.max(...chartData.map(d => d.valor));
-  const rawMin = Math.min(...chartData.map(d => d.valor));
+  const rawMax = chartData.length > 0 ? Math.max(...chartData.map(d => d.valor)) : 0;
+  const rawMin = chartData.length > 0 ? Math.min(...chartData.map(d => d.valor)) : 0;
   const range = rawMax - rawMin === 0 ? 1 : rawMax - rawMin;
 
   const maxValChart = rawMax + (range * 0.15);
@@ -170,13 +177,14 @@ export default function PostventaDashboard() {
 
   const getPercY = (val) => 100 - (((val - minValChart) / paddedRange) * 100);
 
+  // Mapeo seguro para evitar NaN
   const pts = chartData.map((d, i) => ({
     x: n > 1 ? (i / (n - 1)) * 100 : 50,
-    y: getPercY(d.valor)
+    y: isNaN(getPercY(d.valor)) ? 50 : getPercY(d.valor)
   }));
 
-  const yTrendStart = getPercY(intercept);
-  const yTrendEnd = getPercY(slope * (n - 1) + intercept);
+  const yTrendStart = isNaN(getPercY(intercept)) ? 50 : getPercY(intercept);
+  const yTrendEnd = isNaN(getPercY(slope * (n - 1) + intercept)) ? 50 : getPercY(slope * (n - 1) + intercept);
 
   return (
     <div className="flex flex-col xl:flex-row min-h-screen bg-[#F1F5F9] font-sans text-gray-800 antialiased">
@@ -269,7 +277,6 @@ export default function PostventaDashboard() {
                         <td className="p-5 text-right">
                           <div className="flex items-center justify-end gap-3">
                             <span className="text-sm font-semibold text-gray-600">{formatMoney(valComp, kpi)}</span>
-                            {/* AQUÍ SE APLICA LA MAGIA DE LA INVERSIÓN */}
                             <DeltaBadge value={calcDelta(valAct, valComp)} kpiName={kpi} />
                           </div>
                         </td>
@@ -329,10 +336,7 @@ export default function PostventaDashboard() {
                     if (val1 === 0 && val2 === 0 && val3 === 0) return null;
 
                     const maxVal = Math.max(val1, val2, val3);
-
-                    // Si el KPI es de permanencia, el ganador no es el mayor, sino el menor (que no sea 0 si queremos ser exactos).
                     const isReverse = String(kpi).toLowerCase().includes('permanencia');
-                    // Para buscar el mínimo real excluyendo ceros:
                     const vals = [val1, val2, val3].filter(v => v > 0);
                     const minVal = vals.length > 0 ? Math.min(...vals) : 0;
                     const winningVal = isReverse ? minVal : maxVal;
@@ -351,7 +355,7 @@ export default function PostventaDashboard() {
             </div>
           </div>
 
-          {/* NUEVA SECCIÓN: GRÁFICA DE LÍNEAS + TABLA HISTÓRICA */}
+          {/* GRÁFICA DE LÍNEAS + TABLA HISTÓRICA */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
 
             <div className="p-6 border-b border-gray-100 bg-white flex flex-col xl:flex-row justify-between xl:items-center gap-6">
@@ -369,41 +373,44 @@ export default function PostventaDashboard() {
             </div>
 
             {/* LA GRÁFICA DE LÍNEAS */}
-            <div className="p-6 border-b border-gray-100 bg-[#F8FAFC]/50 overflow-x-auto">
-              <div className="relative h-72 min-w-[900px] mt-4 mb-2">
+            {chartData.length > 0 ? (
+              <div className="p-6 border-b border-gray-100 bg-[#F8FAFC]/50 overflow-x-auto">
+                <div className="relative h-72 min-w-[900px] mt-4 mb-2">
+                  <div className="absolute top-0 left-0 w-full h-[80%]">
+                    <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 100">
+                      {n > 1 && (
+                        <line x1="0" y1={yTrendStart} x2="100" y2={yTrendEnd} stroke="#9CA3AF" strokeWidth="2" strokeDasharray="4" vectorEffect="non-scaling-stroke" />
+                      )}
+                      <polyline points={pts.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#003366" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+                    </svg>
 
-                <div className="absolute top-0 left-0 w-full h-[80%]">
-                  <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 100">
-                    {n > 1 && (
-                      <line x1="0" y1={yTrendStart} x2="100" y2={yTrendEnd} stroke="#9CA3AF" strokeWidth="2" strokeDasharray="4" vectorEffect="non-scaling-stroke" />
-                    )}
-                    <polyline points={pts.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#003366" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-                  </svg>
-
-                  {pts.map((p, i) => (
-                    <div key={i} className="absolute" style={{ left: `${p.x}%`, top: `${p.y}%`, transform: 'translate(-50%, -50%)' }}>
-                      <div className="group relative cursor-pointer">
-                        <div className="w-4 h-4 bg-white border-[3px] border-[#003366] rounded-full z-10 shadow-sm transition-transform hover:scale-125"></div>
-                        <span className="absolute -top-7 left-1/2 -translate-x-1/2 text-[10px] font-bold text-[#003366] bg-white/80 px-1 rounded whitespace-nowrap pointer-events-none">
-                          {formatMoney(chartData[i].valor, kpiGrafica)}
-                        </span>
-                        <div className="opacity-0 group-hover:opacity-100 absolute bottom-full mb-3 left-1/2 -translate-x-1/2 bg-[#002244] text-white text-xs font-bold py-1.5 px-3 rounded shadow-lg whitespace-nowrap pointer-events-none transition-opacity z-20">
-                          {chartData[i].mes}: {formatMoney(chartData[i].valor, kpiGrafica)}
+                    {pts.map((p, i) => (
+                      <div key={i} className="absolute" style={{ left: `${p.x}%`, top: `${p.y}%`, transform: 'translate(-50%, -50%)' }}>
+                        <div className="group relative cursor-pointer">
+                          <div className="w-4 h-4 bg-white border-[3px] border-[#003366] rounded-full z-10 shadow-sm transition-transform hover:scale-125"></div>
+                          <span className="absolute -top-7 left-1/2 -translate-x-1/2 text-[10px] font-bold text-[#003366] bg-white/80 px-1 rounded whitespace-nowrap pointer-events-none">
+                            {formatMoney(chartData[i].valor, kpiGrafica)}
+                          </span>
+                          <div className="opacity-0 group-hover:opacity-100 absolute bottom-full mb-3 left-1/2 -translate-x-1/2 bg-[#002244] text-white text-xs font-bold py-1.5 px-3 rounded shadow-lg whitespace-nowrap pointer-events-none transition-opacity z-20">
+                            {chartData[i].mes}: {formatMoney(chartData[i].valor, kpiGrafica)}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
 
-                <div className="absolute bottom-0 left-0 w-full h-[20%] flex items-end pb-2">
-                  {pts.map((p, i) => (
-                    <div key={i} className="absolute text-[10px] sm:text-xs font-bold text-gray-500 whitespace-nowrap" style={{ left: `${p.x}%`, transform: 'translateX(-50%)' }}>
-                      {chartData[i].mes}
-                    </div>
-                  ))}
+                  <div className="absolute bottom-0 left-0 w-full h-[20%] flex items-end pb-2">
+                    {pts.map((p, i) => (
+                      <div key={i} className="absolute text-[10px] sm:text-xs font-bold text-gray-500 whitespace-nowrap" style={{ left: `${p.x}%`, transform: 'translateX(-50%)' }}>
+                        {chartData[i].mes}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="p-10 text-center text-gray-500 font-bold">No hay datos suficientes para graficar.</div>
+            )}
 
             {/* LA TABLA HISTÓRICA */}
             <div className="overflow-x-auto">
