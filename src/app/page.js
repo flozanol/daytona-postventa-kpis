@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Papa from 'papaparse';
-import { TrendingUp, TrendingDown, Minus, Calendar, MapPin, Activity, Users } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Calendar, MapPin, Activity, Users, History } from 'lucide-react';
 
 export default function PostventaDashboard() {
   const [data, setData] = useState([]);
@@ -21,6 +21,15 @@ export default function PostventaDashboard() {
 
   const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTwcS4mh6qN2rqhcrnuBEssd5GIsEiXAp242OuqK9tuxEZfR_xRRJszCRbiDTUJIzbOwpkJpa4kqI4_/pub?gid=1096001978&single=true&output=csv';
 
+  // Lógica para ordenar los meses cronológicamente (ej: de Ene-25 a Feb-26)
+  const mesesOrdenMap = { Ene: '01', Feb: '02', Mar: '03', Abr: '04', May: '05', Jun: '06', Jul: '07', Ago: '08', Sep: '09', Oct: '10', Nov: '11', Dic: '12' };
+
+  const parseMesToSortable = (mesStr) => {
+    if (!mesStr || !mesStr.includes('-')) return '9999-99';
+    const [mmm, yy] = mesStr.split('-');
+    return `20${yy}-${mesesOrdenMap[mmm]}`;
+  };
+
   useEffect(() => {
     Papa.parse(CSV_URL, {
       download: true,
@@ -35,8 +44,11 @@ export default function PostventaDashboard() {
           const catDisp = [...new Set(cleanData.map(d => d.Tipo))];
           const agenciasDisp = [...new Set(cleanData.map(d => d.Agencia))].sort();
 
-          setMesBase(mesesDisp[mesesDisp.length - 1]);
-          setMesComparacion(mesesDisp.length > 1 ? mesesDisp[mesesDisp.length - 2] : mesesDisp[mesesDisp.length - 1]);
+          // Ordenar meses para seleccionar el más reciente por defecto
+          const sortedMeses = mesesDisp.sort((a, b) => parseMesToSortable(a).localeCompare(parseMesToSortable(b)));
+
+          setMesBase(sortedMeses[sortedMeses.length - 1]);
+          setMesComparacion(sortedMeses.length > 1 ? sortedMeses[sortedMeses.length - 2] : sortedMeses[sortedMeses.length - 1]);
           setSelectedCategory(catDisp[0]);
 
           if (agenciasDisp.length > 0) {
@@ -62,7 +74,7 @@ export default function PostventaDashboard() {
   };
 
   const formatMoney = (val, kpiName) => {
-    if (val === 0) return '-';
+    if (val === 0 || val === null) return '-';
     const nameLower = String(kpiName).toLowerCase();
     if (nameLower.includes('%')) return val.toFixed(1) + '%';
 
@@ -81,21 +93,34 @@ export default function PostventaDashboard() {
     return <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 text-gray-500 text-xs font-bold"><Minus size={12} /> 0%</span>;
   };
 
-  // Pantalla de carga con fondo azul para el logo
   if (loading) return <div className="flex h-screen flex-col items-center justify-center bg-[#003366]"><img src="https://grupodaytona.com/_next/image?url=https%3A%2F%2Fapi.grupodaytona.com%2Ffiles%2Fimages%2Ffull-xzLxpZqXUE-1728519042236.png&w=384&q=75" alt="Daytona" className="w-48 mb-6 animate-pulse" /><div className="text-white/70 font-bold text-sm tracking-widest">CARGANDO...</div></div>;
 
   const agencias = [...new Set(data.map(d => d.Agencia))].sort();
-  const meses = [...new Set(data.map(d => d.Mes))].reverse();
+  // Meses ordenados cronológicamente inverso para los selectores (más nuevo arriba)
+  const mesesDispRaw = [...new Set(data.map(d => d.Mes))];
+  const mesesSelectores = mesesDispRaw.sort((a, b) => parseMesToSortable(b).localeCompare(parseMesToSortable(a)));
+
   const categorias = [...new Set(data.map(d => d.Tipo))];
   const todosLosKPIs = [...new Set(data.map(d => d.KPI))];
 
+  // Lógica para la Tabla Histórica Final
+  const getMesesHistoricosArr = () => {
+    const sortedAll = mesesDispRaw.sort((a, b) => parseMesToSortable(a).localeCompare(parseMesToSortable(b)));
+    const sortableSelected = parseMesToSortable(mesBase);
+    // Filtrar desde Ene-25 hasta el mes seleccionado inclusive
+    return sortedAll.filter(m => parseMesToSortable(m) <= sortableSelected);
+  };
+
+  const mesesHistoricosArr = getMesesHistoricosArr();
+  const agenciaHistoricaNombre = selectedAgencia === 'Todas' ? 'Consolidado Grupo' : selectedAgencia;
+
   return (
-    <div className="flex flex-col xl:flex-row min-h-screen bg-[#F1F5F9] font-sans text-gray-800">
+    <div className="flex flex-col xl:flex-row min-h-screen bg-[#F1F5F9] font-sans text-gray-800 antialiased">
 
       {/* SIDEBAR */}
       <div className="w-full xl:w-72 bg-white border-r border-gray-200 shadow-sm flex flex-col z-10 shrink-0">
 
-        {/* ENCABEZADO CORREGIDO CON FONDO AZUL PARA EL LOGO */}
+        {/* ENCABEZADO CON FONDO AZUL PARA EL LOGO */}
         <div className="p-8 border-b border-[#002244] flex flex-col items-center justify-center bg-[#003366] shadow-inner">
           <img src="https://grupodaytona.com/_next/image?url=https%3A%2F%2Fapi.grupodaytona.com%2Ffiles%2Fimages%2Ffull-xzLxpZqXUE-1728519042236.png&w=384&q=75" alt="Grupo Daytona" className="w-40 mb-2" />
           <p className="text-[10px] font-black text-white/70 uppercase tracking-[0.3em]">Business Intelligence</p>
@@ -106,7 +131,7 @@ export default function PostventaDashboard() {
             <label className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase mb-3 tracking-wider"><Calendar size={14} className="text-[#003366]" /> 1. Mes de Análisis</label>
             <select className="w-full p-3 bg-white border border-gray-300 rounded-lg text-sm font-bold text-[#003366] shadow-sm outline-none hover:border-[#003366] transition-colors cursor-pointer"
               value={mesBase} onChange={e => setMesBase(e.target.value)}>
-              {meses.map(m => <option key={m} value={m}>{m}</option>)}
+              {mesesSelectores.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
 
@@ -114,7 +139,7 @@ export default function PostventaDashboard() {
             <label className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase mb-3 tracking-wider"><Calendar size={14} className="text-gray-400" /> 2. Comparar Contra</label>
             <select className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-gray-600 outline-none cursor-pointer"
               value={mesComparacion} onChange={e => setMesComparacion(e.target.value)}>
-              {meses.map(m => <option key={m} value={m}>{m}</option>)}
+              {mesesSelectores.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
 
@@ -152,9 +177,7 @@ export default function PostventaDashboard() {
           </div>
         </div>
 
-        {/* SECCIÓN DE TARJETAS ELIMINADA TEMPORALMENTE */}
-
-        <div className="space-y-10">
+        <div className="space-y-10 pb-12">
 
           {/* TABLA 1: ANÁLISIS TEMPORAL */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
@@ -250,6 +273,52 @@ export default function PostventaDashboard() {
                         {compAg1 !== 'Ninguna' && <td className={`p-5 text-right font-black text-lg ${val1 === maxVal && val1 > 0 ? 'text-green-600' : 'text-gray-800'}`}>{formatMoney(val1, kpi)}</td>}
                         {compAg2 !== 'Ninguna' && <td className={`p-5 text-right font-black text-lg ${val2 === maxVal && val2 > 0 ? 'text-green-600' : 'text-gray-800'}`}>{formatMoney(val2, kpi)}</td>}
                         {compAg3 !== 'Ninguna' && <td className={`p-5 text-right font-black text-lg ${val3 === maxVal && val3 > 0 ? 'text-green-600' : 'text-gray-800'}`}>{formatMoney(val3, kpi)}</td>}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* NUEVA TABLA 3: TENDENCIA HISTÓRICA DETALLADA */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="p-6 border-b border-gray-100 bg-white">
+              <h2 className="text-xl font-black text-[#003366] flex items-center gap-2"><History size={20} /> Tendencia Histórica Detallada: {agenciaHistoricaNombre}</h2>
+              <p className="text-sm text-gray-500 mt-1">Evolución mensual desde Enero 2025 hasta {mesBase} (solo canal {selectedCategory}).</p>
+            </div>
+
+            {/* Contenedor con scroll horizontal para soportar muchos meses */}
+            <div className="overflow-x-auto">
+              {/* min-w-[1500px] asegura que haya espacio suficiente para las columnas sin encimarse */}
+              <table className="w-full text-left table-fixed min-w-[1500px]">
+                <thead>
+                  <tr className="bg-[#F8FAFC] text-gray-500 text-xs uppercase tracking-wider">
+                    {/* sticky left-0 y z-1 para dejar fija la columna de nombres de KPI al scrollear */}
+                    <th className="p-5 font-bold border-b border-gray-100 w-64 sticky left-0 bg-[#F8FAFC] z-10 shadow-[2px_0_5px_0_rgba(0,0,0,0.05)]">Indicador (KPI)</th>
+                    {mesesHistoricosArr.map(m => (
+                      <th key={m} className="p-5 font-bold border-b border-gray-100 text-right w-36">{m}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {todosLosKPIs.map(kpi => {
+                    // Ocultar fila si no hay datos en todo el histórico para este KPI
+                    const hasDataInHistory = mesesHistoricosArr.some(m => getVal(m, selectedCategory, selectedAgencia, kpi) > 0);
+                    if (!hasDataInHistory) return null;
+
+                    return (
+                      <tr key={kpi} className="hover:bg-blue-50/40 group transition-colors">
+                        {/* sticky left-0 bg-white para la columna fija en el cuerpo de la tabla */}
+                        <td className="p-5 font-bold text-gray-700 bg-white sticky left-0 z-1 shadow-[2px_0_5px_0_rgba(0,0,0,0.05)] group-hover:bg-[#EBF5FF] transition-colors">{kpi}</td>
+                        {mesesHistoricosArr.map(m => {
+                          const val = getVal(m, selectedCategory, selectedAgencia, kpi);
+                          return (
+                            <td key={m} className="p-5 text-right font-medium text-gray-700">
+                              {formatMoney(val, kpi)}
+                            </td>
+                          );
+                        })}
                       </tr>
                     );
                   })}
