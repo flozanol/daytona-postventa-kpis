@@ -30,7 +30,6 @@ export default function PostventaDashboard() {
           const mesesDisp = [...new Set(cleanData.map(d => d.Mes))];
           const catDisp = [...new Set(cleanData.map(d => d.Tipo))];
 
-          // Por defecto seleccionamos los últimos dos meses disponibles
           setMesBase(mesesDisp[mesesDisp.length - 1]);
           setMesComparacion(mesesDisp.length > 1 ? mesesDisp[mesesDisp.length - 2] : mesesDisp[mesesDisp.length - 1]);
           setSelectedCategory(catDisp[0]);
@@ -52,11 +51,30 @@ export default function PostventaDashboard() {
     return ((actual - anterior) / anterior) * 100;
   };
 
+  // --- AQUÍ ESTÁ LA MAGIA CORREGIDA ---
   const formatMoney = (val, kpiName) => {
-    if (String(kpiName).includes('%')) return val.toFixed(1) + '%';
-    if (String(kpiName).includes('Órdenes') || String(kpiName).includes('Unidades')) return val.toLocaleString('es-MX');
-    return '$' + val.toLocaleString('es-MX');
+    const nameLower = String(kpiName).toLowerCase();
+
+    // 1. Si es porcentaje explícito
+    if (nameLower.includes('%')) return val.toFixed(1) + '%';
+
+    // 2. Palabras clave que NO son dinero
+    const keywordsGeneral = [
+      'ordenes', 'órdenes', 'unidades', 'facturadas',
+      'permanencia', 'retención', 'retencion'
+    ];
+
+    const isGeneralNumber = keywordsGeneral.some(kw => nameLower.includes(kw));
+
+    if (isGeneralNumber) {
+      // Si tiene decimales (como Permanencia Promedio), le dejamos 1 decimal, si es entero, lo dejamos cerrado
+      return Number.isInteger(val) ? val.toLocaleString('es-MX') : val.toLocaleString('es-MX', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    }
+
+    // 3. Todo lo demás es Dinero
+    return '$' + val.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   };
+  // -------------------------------------
 
   const DeltaBadge = ({ value }) => {
     if (value > 0) return <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-green-100 text-green-700 text-xs font-bold"><TrendingUp size={12} /> +{value.toFixed(1)}%</span>;
