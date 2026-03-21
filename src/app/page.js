@@ -2,13 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import Papa from 'papaparse';
-import { TrendingUp, TrendingDown, Minus, Calendar, MapPin, Activity } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Calendar, MapPin, DollarSign, Activity, FileText } from 'lucide-react';
 
 export default function PostventaDashboard() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Filtros
   const [selectedMonth, setSelectedMonth] = useState('');
   const [selectedAgencia, setSelectedAgencia] = useState('Todas');
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -46,10 +45,7 @@ export default function PostventaDashboard() {
     let pMes = mIndex === 0 ? 'Dic' : meses[mIndex - 1];
     let pMesAño = mIndex === 0 ? año - 1 : año;
 
-    return {
-      prevMes: `${pMes}-${pMesAño}`,
-      prevAño: `${mesStr}-${año - 1}`
-    };
+    return { prevMes: `${pMes}-${pMesAño}`, prevAño: `${mesStr}-${año - 1}` };
   };
 
   const getVal = (m, c, a, k) => {
@@ -71,12 +67,12 @@ export default function PostventaDashboard() {
   };
 
   const DeltaBadge = ({ value }) => {
-    if (value > 0) return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-green-100 text-green-800 text-xs font-bold"><TrendingUp size={14} /> +{value.toFixed(1)}%</span>;
-    if (value < 0) return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-red-100 text-red-800 text-xs font-bold"><TrendingDown size={14} /> {value.toFixed(1)}%</span>;
-    return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-100 text-gray-600 text-xs font-bold"><Minus size={14} /> 0%</span>;
+    if (value > 0) return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold"><TrendingUp size={12} /> +{value.toFixed(1)}%</span>;
+    if (value < 0) return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-100 text-red-700 text-xs font-bold"><TrendingDown size={12} /> {value.toFixed(1)}%</span>;
+    return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gray-100 text-gray-600 text-xs font-bold"><Minus size={12} /> 0%</span>;
   };
 
-  if (loading) return <div className="flex h-screen items-center justify-center bg-[#F3F4F6]"><div className="text-2xl font-bold text-[#003366] animate-pulse">Cargando KPIs Daytona...</div></div>;
+  if (loading) return <div className="flex h-screen items-center justify-center bg-gray-50"><div className="text-xl font-bold text-[#003366] animate-pulse">Cargando Daytona Postventa...</div></div>;
 
   const agencias = [...new Set(data.map(d => d.Agencia))].sort();
   const meses = [...new Set(data.map(d => d.Mes))].reverse();
@@ -84,28 +80,33 @@ export default function PostventaDashboard() {
   const todosLosKPIs = [...new Set(data.map(d => d.KPI))];
   const { prevMes, prevAño } = getPeriodos(selectedMonth);
 
-  return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-gray-50 text-gray-900 font-sans">
+  // KPIs para las tarjetas superiores
+  const vTotal = getVal(selectedMonth, selectedCategory, selectedAgencia, 'Venta Total');
+  const uBruta = getVal(selectedMonth, selectedCategory, selectedAgencia, 'Utilidad Bruta');
+  const ordenes = getVal(selectedMonth, selectedCategory, selectedAgencia, 'Órdenes');
 
-      {/* SIDEBAR (Barra Izquierda) */}
-      <div className="w-full md:w-72 bg-white border-r border-gray-200 shadow-sm flex flex-col">
+  return (
+    <div className="flex flex-col md:flex-row min-h-screen bg-slate-50 font-sans">
+
+      {/* SIDEBAR - Estilo Daytona Nuevos */}
+      <div className="w-full md:w-72 bg-white border-r border-gray-200 shadow-sm flex flex-col z-10">
         <div className="p-6 border-b border-gray-100">
-          <h1 className="text-3xl font-black text-[#003366] tracking-tight">DAYTONA</h1>
-          <p className="text-sm font-semibold text-gray-500 uppercase tracking-widest mt-1">Postventa</p>
+          <h1 className="text-2xl font-black text-[#003366] tracking-tight">DAYTONA</h1>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Postventa KPIs</p>
         </div>
 
         <div className="p-6 flex-1 space-y-6">
           <div>
-            <label className="flex items-center gap-2 text-sm font-bold text-gray-700 uppercase mb-2"><Calendar size={16} /> 1. Mes Actual</label>
-            <select className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#003366] outline-none cursor-pointer"
+            <label className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase mb-2"><Calendar size={14} /> Mes de Análisis</label>
+            <select className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-[#003366] focus:ring-2 focus:ring-[#003366] outline-none transition-all cursor-pointer"
               value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
               {meses.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
 
           <div>
-            <label className="flex items-center gap-2 text-sm font-bold text-gray-700 uppercase mb-2"><MapPin size={16} /> 2. Agencia a Analizar</label>
-            <select className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#003366] outline-none cursor-pointer"
+            <label className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase mb-2"><MapPin size={14} /> Agencia</label>
+            <select className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-[#003366] focus:ring-2 focus:ring-[#003366] outline-none transition-all cursor-pointer"
               value={selectedAgencia} onChange={e => setSelectedAgencia(e.target.value)}>
               <option value="Todas">Consolidado (Todas)</option>
               {agencias.map(a => <option key={a} value={a}>{a}</option>)}
@@ -115,41 +116,55 @@ export default function PostventaDashboard() {
       </div>
 
       {/* ÁREA PRINCIPAL */}
-      <div className="flex-1 p-4 md:p-8 overflow-y-auto">
+      <div className="flex-1 p-6 md:p-10 overflow-y-auto">
 
-        {/* TABS (Categorías) */}
-        <div className="flex gap-2 mb-8 overflow-x-auto pb-2">
+        {/* TABS DE CATEGORÍA */}
+        <div className="flex gap-2 mb-8 border-b border-gray-200 pb-4 overflow-x-auto">
           {categorias.map(c => (
             <button
-              key={c}
-              onClick={() => setSelectedCategory(c)}
-              className={`px-5 py-2.5 rounded-lg font-bold text-sm transition-all whitespace-nowrap shadow-sm
-                ${selectedCategory === c ? 'bg-[#003366] text-white' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'}`}
+              key={c} onClick={() => setSelectedCategory(c)}
+              className={`px-6 py-2 rounded-full font-bold text-sm transition-all whitespace-nowrap
+                ${selectedCategory === c ? 'bg-[#003366] text-white shadow-md' : 'bg-white text-gray-500 hover:text-[#003366] hover:bg-blue-50 border border-gray-200'}`}
             >
               {c}
             </button>
           ))}
         </div>
 
+        {/* TARJETAS DE RESUMEN (KPI CARDS - Como en Nuevos) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 border-l-4 border-l-[#003366]">
+            <div className="flex items-center gap-2 text-gray-500 mb-2"><DollarSign size={16} /> <h3 className="text-sm font-bold">Venta Total</h3></div>
+            <p className="text-3xl font-black text-gray-800">${vTotal.toLocaleString('es-MX')}</p>
+            <p className="text-xs text-gray-400 mt-2 font-medium">Canal: {selectedCategory}</p>
+          </div>
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 border-l-4 border-l-blue-400">
+            <div className="flex items-center gap-2 text-gray-500 mb-2"><Activity size={16} /> <h3 className="text-sm font-bold">Utilidad Bruta</h3></div>
+            <p className="text-3xl font-black text-gray-800">${uBruta.toLocaleString('es-MX')}</p>
+            <p className="text-xs text-gray-400 mt-2 font-medium">Mes: {selectedMonth}</p>
+          </div>
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 border-l-4 border-l-gray-400">
+            <div className="flex items-center gap-2 text-gray-500 mb-2"><FileText size={16} /> <h3 className="text-sm font-bold">Órdenes</h3></div>
+            <p className="text-3xl font-black text-gray-800">{ordenes.toLocaleString('es-MX')}</p>
+            <p className="text-xs text-gray-400 mt-2 font-medium">Agencia: {selectedAgencia}</p>
+          </div>
+        </div>
+
         <div className="space-y-8">
 
-          {/* TABLA 1: MISMA AGENCIA / COMPARATIVA TIEMPO */}
+          {/* TABLA 1: COMPARATIVA TEMPORAL */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="p-6 border-b border-gray-100 bg-white">
-              <h2 className="text-xl font-bold text-[#003366] flex items-center gap-2">
-                <Activity size={20} /> Desempeño: {selectedAgencia}
-              </h2>
-              <p className="text-sm text-gray-500 mt-1">Comparando el mes actual contra el mes anterior y el mismo mes del año pasado.</p>
+            <div className="p-5 border-b border-gray-100 bg-white">
+              <h2 className="text-lg font-bold text-[#003366]">Análisis Detallado: {selectedAgencia}</h2>
             </div>
-
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider">
-                    <th className="p-4 font-bold border-b">Indicador (KPI)</th>
-                    <th className="p-4 font-bold border-b text-right">Actual ({selectedMonth})</th>
-                    <th className="p-4 font-bold border-b text-right">vs Mes Ant. ({prevMes})</th>
-                    <th className="p-4 font-bold border-b text-right">vs Año Ant. ({prevAño})</th>
+                  <tr className="bg-gray-50/50 text-gray-500 text-xs uppercase tracking-wider">
+                    <th className="p-4 font-bold border-b border-gray-100">Indicador (KPI)</th>
+                    <th className="p-4 font-bold border-b border-gray-100 text-right">Actual ({selectedMonth})</th>
+                    <th className="p-4 font-bold border-b border-gray-100 text-right">Mes Ant. ({prevMes})</th>
+                    <th className="p-4 font-bold border-b border-gray-100 text-right">Año Ant. ({prevAño})</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -157,22 +172,21 @@ export default function PostventaDashboard() {
                     const valAct = getVal(selectedMonth, selectedCategory, selectedAgencia, kpi);
                     const valMes = getVal(prevMes, selectedCategory, selectedAgencia, kpi);
                     const valAño = getVal(prevAño, selectedCategory, selectedAgencia, kpi);
-
                     if (valAct === 0 && valMes === 0 && valAño === 0) return null;
 
                     return (
                       <tr key={kpi} className="hover:bg-blue-50/30 transition-colors">
-                        <td className="p-4 font-semibold text-gray-800">{kpi}</td>
-                        <td className="p-4 text-right font-bold text-[#003366] text-lg">{formatMoney(valAct, kpi)}</td>
+                        <td className="p-4 font-semibold text-gray-700">{kpi}</td>
+                        <td className="p-4 text-right font-black text-[#003366]">{formatMoney(valAct, kpi)}</td>
                         <td className="p-4 text-right">
-                          <div className="flex flex-col items-end gap-1">
-                            <span className="text-sm text-gray-500">{formatMoney(valMes, kpi)}</span>
+                          <div className="flex items-center justify-end gap-3">
+                            <span className="text-sm font-medium text-gray-600">{formatMoney(valMes, kpi)}</span>
                             <DeltaBadge value={calcDelta(valAct, valMes)} />
                           </div>
                         </td>
                         <td className="p-4 text-right">
-                          <div className="flex flex-col items-end gap-1">
-                            <span className="text-sm text-gray-500">{formatMoney(valAño, kpi)}</span>
+                          <div className="flex items-center justify-end gap-3">
+                            <span className="text-sm font-medium text-gray-600">{formatMoney(valAño, kpi)}</span>
                             <DeltaBadge value={calcDelta(valAct, valAño)} />
                           </div>
                         </td>
@@ -184,52 +198,40 @@ export default function PostventaDashboard() {
             </div>
           </div>
 
-          {/* TABLA 2: COMPARATIVA ENTRE AGENCIAS */}
+          {/* TABLA 2: RANKING AGENCIAS */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="p-6 border-b border-gray-100 bg-white flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-              <div>
-                <h2 className="text-xl font-bold text-[#003366]">Ranking de Agencias</h2>
-                <p className="text-sm text-gray-500 mt-1">Comparativa de todas las agencias en el mismo mes.</p>
-              </div>
+            <div className="p-5 border-b border-gray-100 bg-white flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+              <h2 className="text-lg font-bold text-[#003366]">Ranking Comparativo</h2>
               <div className="flex items-center gap-2">
-                <label className="text-sm font-bold text-gray-700">Analizar KPI:</label>
-                <select
-                  className="p-2 bg-gray-50 border border-gray-300 rounded-lg text-sm font-semibold text-[#003366] outline-none cursor-pointer"
-                  value={selectedKPIComparativo}
-                  onChange={e => setSelectedKPIComparativo(e.target.value)}
-                >
+                <span className="text-xs font-bold text-gray-500 uppercase">Analizar:</span>
+                <select className="p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-[#003366] outline-none"
+                  value={selectedKPIComparativo} onChange={e => setSelectedKPIComparativo(e.target.value)}>
                   {todosLosKPIs.map(k => <option key={k} value={k}>{k}</option>)}
                 </select>
               </div>
             </div>
-
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-[#003366] text-white text-xs uppercase tracking-wider">
-                    <th className="p-4 font-bold border-b border-[#002244]">Agencia</th>
-                    <th className="p-4 font-bold border-b border-[#002244] text-right">Resultado ({selectedMonth})</th>
-                    <th className="p-4 font-bold border-b border-[#002244] text-right">Participación en Grupo</th>
+                  <tr className="bg-gray-50/50 text-gray-500 text-xs uppercase tracking-wider">
+                    <th className="p-4 font-bold border-b border-gray-100">Agencia</th>
+                    <th className="p-4 font-bold border-b border-gray-100 text-right">Resultado ({selectedMonth})</th>
+                    <th className="p-4 font-bold border-b border-gray-100 text-right">Share %</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {agencias.map(ag => {
-                    const valAgencia = getVal(selectedMonth, selectedCategory, ag, selectedKPIComparativo);
-                    const valTotal = getVal(selectedMonth, selectedCategory, 'Todas', selectedKPIComparativo);
-                    const share = valTotal > 0 ? (valAgencia / valTotal) * 100 : 0;
-
-                    if (valAgencia === 0) return null;
+                    const valAg = getVal(selectedMonth, selectedCategory, ag, selectedKPIComparativo);
+                    const valTot = getVal(selectedMonth, selectedCategory, 'Todas', selectedKPIComparativo);
+                    const share = valTot > 0 ? (valAg / valTot) * 100 : 0;
+                    if (valAg === 0) return null;
 
                     return (
                       <tr key={ag} className="hover:bg-blue-50/30 transition-colors">
-                        <td className="p-4 font-bold text-gray-800">{ag}</td>
-                        <td className="p-4 text-right font-bold text-gray-900 text-lg">
-                          {formatMoney(valAgencia, selectedKPIComparativo)}
-                        </td>
+                        <td className="p-4 font-bold text-gray-700">{ag}</td>
+                        <td className="p-4 text-right font-black text-gray-800">{formatMoney(valAg, selectedKPIComparativo)}</td>
                         <td className="p-4 text-right">
-                          <span className="inline-block bg-blue-100 text-[#003366] font-bold px-3 py-1 rounded-full text-sm">
-                            {share.toFixed(1)}%
-                          </span>
+                          <span className="bg-[#003366]/10 text-[#003366] font-black px-3 py-1 rounded-md text-sm">{share.toFixed(1)}%</span>
                         </td>
                       </tr>
                     );
