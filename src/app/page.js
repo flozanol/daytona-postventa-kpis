@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Papa from 'papaparse';
-import { TrendingUp, TrendingDown, Minus, Calendar, MapPin, Activity, Users, History, LineChart } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Calendar, MapPin, Activity, Users, History, BarChart2 } from 'lucide-react';
 
 export default function PostventaDashboard() {
   const [data, setData] = useState([]);
@@ -22,12 +22,29 @@ export default function PostventaDashboard() {
 
   const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTwcS4mh6qN2rqhcrnuBEssd5GIsEiXAp242OuqK9tuxEZfR_xRRJszCRbiDTUJIzbOwpkJpa4kqI4_/pub?gid=1096001978&single=true&output=csv';
 
-  const mesesOrdenMap = { Ene: '01', Feb: '02', Mar: '03', Abr: '04', May: '05', Jun: '06', Jul: '07', Ago: '08', Sep: '09', Oct: '10', Nov: '11', Dic: '12' };
+  // Lógica blindada para ordenar meses (ignora espacios o si dice "Enero" completo)
+  const getMonthNumber = (m) => {
+    const lower = String(m).trim().toLowerCase();
+    if (lower.startsWith('ene')) return '01';
+    if (lower.startsWith('feb')) return '02';
+    if (lower.startsWith('mar')) return '03';
+    if (lower.startsWith('abr')) return '04';
+    if (lower.startsWith('may')) return '05';
+    if (lower.startsWith('jun')) return '06';
+    if (lower.startsWith('jul')) return '07';
+    if (lower.startsWith('ago')) return '08';
+    if (lower.startsWith('sep')) return '09';
+    if (lower.startsWith('oct')) return '10';
+    if (lower.startsWith('nov')) return '11';
+    if (lower.startsWith('dic')) return '12';
+    return '99';
+  };
 
   const parseMesToSortable = (mesStr) => {
     if (!mesStr || !mesStr.includes('-')) return '9999-99';
     const [mmm, yy] = mesStr.split('-');
-    return `20${yy}-${mesesOrdenMap[mmm]}`;
+    const year = yy.length === 2 ? `20${yy}` : yy;
+    return `${year}-${getMonthNumber(mmm)}`;
   };
 
   useEffect(() => {
@@ -90,9 +107,22 @@ export default function PostventaDashboard() {
     return '$' + val.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   };
 
-  const DeltaBadge = ({ value }) => {
-    if (value > 0) return <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-green-100 text-green-700 text-xs font-bold"><TrendingUp size={12} /> +{value.toFixed(1)}%</span>;
-    if (value < 0) return <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-red-100 text-red-700 text-xs font-bold"><TrendingDown size={12} /> {value.toFixed(1)}%</span>;
+  // --- LÓGICA INVERSA IMPLEMENTADA AQUÍ ---
+  const DeltaBadge = ({ value, kpiName }) => {
+    const isReverseLogic = String(kpiName).toLowerCase().includes('permanencia');
+
+    if (value > 0) {
+      // Si sube y es Permanencia, es malo (rojo). Si es otro KPI, es bueno (verde).
+      return isReverseLogic
+        ? <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-red-100 text-red-700 text-xs font-bold"><TrendingUp size={12} /> +{value.toFixed(1)}%</span>
+        : <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-green-100 text-green-700 text-xs font-bold"><TrendingUp size={12} /> +{value.toFixed(1)}%</span>;
+    }
+    if (value < 0) {
+      // Si baja y es Permanencia, es bueno (verde). Si es otro KPI, es malo (rojo).
+      return isReverseLogic
+        ? <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-green-100 text-green-700 text-xs font-bold"><TrendingDown size={12} /> {value.toFixed(1)}%</span>
+        : <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-red-100 text-red-700 text-xs font-bold"><TrendingDown size={12} /> {value.toFixed(1)}%</span>;
+    }
     return <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 text-gray-500 text-xs font-bold"><Minus size={12} /> 0%</span>;
   };
 
@@ -119,7 +149,6 @@ export default function PostventaDashboard() {
     valor: getVal(m, selectedCategory, selectedAgencia, kpiGrafica)
   }));
 
-  // --- MATEMÁTICAS DE LA GRÁFICA Y TENDENCIA ---
   const n = chartData.length;
   let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
   chartData.forEach((d, i) => {
@@ -135,7 +164,6 @@ export default function PostventaDashboard() {
   const rawMin = Math.min(...chartData.map(d => d.valor));
   const range = rawMax - rawMin === 0 ? 1 : rawMax - rawMin;
 
-  // Padding para que los puntos no peguen en el techo ni en el suelo del cuadro
   const maxValChart = rawMax + (range * 0.15);
   const minValChart = Math.max(0, rawMin - (range * 0.1));
   const paddedRange = maxValChart - minValChart === 0 ? 1 : maxValChart - minValChart;
@@ -149,7 +177,6 @@ export default function PostventaDashboard() {
 
   const yTrendStart = getPercY(intercept);
   const yTrendEnd = getPercY(slope * (n - 1) + intercept);
-  // ----------------------------------------------
 
   return (
     <div className="flex flex-col xl:flex-row min-h-screen bg-[#F1F5F9] font-sans text-gray-800 antialiased">
@@ -242,7 +269,8 @@ export default function PostventaDashboard() {
                         <td className="p-5 text-right">
                           <div className="flex items-center justify-end gap-3">
                             <span className="text-sm font-semibold text-gray-600">{formatMoney(valComp, kpi)}</span>
-                            <DeltaBadge value={calcDelta(valAct, valComp)} />
+                            {/* AQUÍ SE APLICA LA MAGIA DE LA INVERSIÓN */}
+                            <DeltaBadge value={calcDelta(valAct, valComp)} kpiName={kpi} />
                           </div>
                         </td>
                       </tr>
@@ -302,12 +330,19 @@ export default function PostventaDashboard() {
 
                     const maxVal = Math.max(val1, val2, val3);
 
+                    // Si el KPI es de permanencia, el ganador no es el mayor, sino el menor (que no sea 0 si queremos ser exactos).
+                    const isReverse = String(kpi).toLowerCase().includes('permanencia');
+                    // Para buscar el mínimo real excluyendo ceros:
+                    const vals = [val1, val2, val3].filter(v => v > 0);
+                    const minVal = vals.length > 0 ? Math.min(...vals) : 0;
+                    const winningVal = isReverse ? minVal : maxVal;
+
                     return (
                       <tr key={kpi} className="hover:bg-blue-50/40 transition-colors">
                         <td className="p-5 font-bold text-gray-700">{kpi}</td>
-                        {compAg1 !== 'Ninguna' && <td className={`p-5 text-right font-black text-lg ${val1 === maxVal && val1 > 0 ? 'text-green-600' : 'text-gray-800'}`}>{formatMoney(val1, kpi)}</td>}
-                        {compAg2 !== 'Ninguna' && <td className={`p-5 text-right font-black text-lg ${val2 === maxVal && val2 > 0 ? 'text-green-600' : 'text-gray-800'}`}>{formatMoney(val2, kpi)}</td>}
-                        {compAg3 !== 'Ninguna' && <td className={`p-5 text-right font-black text-lg ${val3 === maxVal && val3 > 0 ? 'text-green-600' : 'text-gray-800'}`}>{formatMoney(val3, kpi)}</td>}
+                        {compAg1 !== 'Ninguna' && <td className={`p-5 text-right font-black text-lg ${val1 === winningVal && val1 > 0 ? 'text-green-600' : 'text-gray-800'}`}>{formatMoney(val1, kpi)}</td>}
+                        {compAg2 !== 'Ninguna' && <td className={`p-5 text-right font-black text-lg ${val2 === winningVal && val2 > 0 ? 'text-green-600' : 'text-gray-800'}`}>{formatMoney(val2, kpi)}</td>}
+                        {compAg3 !== 'Ninguna' && <td className={`p-5 text-right font-black text-lg ${val3 === winningVal && val3 > 0 ? 'text-green-600' : 'text-gray-800'}`}>{formatMoney(val3, kpi)}</td>}
                       </tr>
                     );
                   })}
@@ -333,34 +368,25 @@ export default function PostventaDashboard() {
               </div>
             </div>
 
-            {/* LA GRÁFICA DE LÍNEAS CON TENDENCIA (Soluciona el corte) */}
+            {/* LA GRÁFICA DE LÍNEAS */}
             <div className="p-6 border-b border-gray-100 bg-[#F8FAFC]/50 overflow-x-auto">
               <div className="relative h-72 min-w-[900px] mt-4 mb-2">
 
-                {/* Zona de Dibujo (Top 80%) */}
                 <div className="absolute top-0 left-0 w-full h-[80%]">
                   <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 100">
-                    {/* Línea de Tendencia (Punteada) */}
                     {n > 1 && (
                       <line x1="0" y1={yTrendStart} x2="100" y2={yTrendEnd} stroke="#9CA3AF" strokeWidth="2" strokeDasharray="4" vectorEffect="non-scaling-stroke" />
                     )}
-                    {/* Línea Principal */}
                     <polyline points={pts.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#003366" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
                   </svg>
 
-                  {/* Puntos y Tooltips */}
                   {pts.map((p, i) => (
                     <div key={i} className="absolute" style={{ left: `${p.x}%`, top: `${p.y}%`, transform: 'translate(-50%, -50%)' }}>
                       <div className="group relative cursor-pointer">
-                        {/* El Punto */}
                         <div className="w-4 h-4 bg-white border-[3px] border-[#003366] rounded-full z-10 shadow-sm transition-transform hover:scale-125"></div>
-
-                        {/* Etiqueta visible */}
                         <span className="absolute -top-7 left-1/2 -translate-x-1/2 text-[10px] font-bold text-[#003366] bg-white/80 px-1 rounded whitespace-nowrap pointer-events-none">
                           {formatMoney(chartData[i].valor, kpiGrafica)}
                         </span>
-
-                        {/* Tooltip Oscuro al pasar el mouse */}
                         <div className="opacity-0 group-hover:opacity-100 absolute bottom-full mb-3 left-1/2 -translate-x-1/2 bg-[#002244] text-white text-xs font-bold py-1.5 px-3 rounded shadow-lg whitespace-nowrap pointer-events-none transition-opacity z-20">
                           {chartData[i].mes}: {formatMoney(chartData[i].valor, kpiGrafica)}
                         </div>
@@ -369,7 +395,6 @@ export default function PostventaDashboard() {
                   ))}
                 </div>
 
-                {/* Etiquetas Eje X (Bottom 20%) */}
                 <div className="absolute bottom-0 left-0 w-full h-[20%] flex items-end pb-2">
                   {pts.map((p, i) => (
                     <div key={i} className="absolute text-[10px] sm:text-xs font-bold text-gray-500 whitespace-nowrap" style={{ left: `${p.x}%`, transform: 'translateX(-50%)' }}>
