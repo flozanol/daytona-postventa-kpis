@@ -18,7 +18,7 @@ export default function PostventaDashboard() {
   const [compAg1, setCompAg1] = useState('');
   const [compAg2, setCompAg2] = useState('');
   const [compAg3, setCompAg3] = useState('Ninguna');
-  const [kpiGrafica, setKpiGrafica] = useState('Venta Total'); // Selector para la gráfica
+  const [kpiGrafica, setKpiGrafica] = useState('Venta Total');
 
   const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTwcS4mh6qN2rqhcrnuBEssd5GIsEiXAp242OuqK9tuxEZfR_xRRJszCRbiDTUJIzbOwpkJpa4kqI4_/pub?gid=1096001978&single=true&output=csv';
 
@@ -44,11 +44,9 @@ export default function PostventaDashboard() {
           const catDisp = [...new Set(cleanData.map(d => d.Tipo))];
           const agenciasDisp = [...new Set(cleanData.map(d => d.Agencia))].sort();
 
-          // 1. Filtrar solo los meses que realmente tienen algún valor mayor a 0 (Evita Dic-26 vacío)
           const mesesConDatos = mesesDisp.filter(m => cleanData.some(d => d.Mes === m && Number(d.Valor) > 0));
           const sortedMesesReales = mesesConDatos.sort((a, b) => parseMesToSortable(a).localeCompare(parseMesToSortable(b)));
 
-          // Seleccionamos el mes más reciente con datos reales
           const mesActual = sortedMesesReales.length > 0 ? sortedMesesReales[sortedMesesReales.length - 1] : mesesDisp[0];
           const mesAnt = sortedMesesReales.length > 1 ? sortedMesesReales[sortedMesesReales.length - 2] : mesActual;
 
@@ -102,14 +100,12 @@ export default function PostventaDashboard() {
 
   const agencias = [...new Set(data.map(d => d.Agencia))].sort();
 
-  // Limpiamos los selectores para que no muestren meses vacíos del futuro
   const mesesConDatosGlobal = [...new Set(data.filter(d => Number(d.Valor) > 0).map(d => d.Mes))];
   const mesesSelectores = mesesConDatosGlobal.sort((a, b) => parseMesToSortable(b).localeCompare(parseMesToSortable(a)));
 
   const categorias = [...new Set(data.map(d => d.Tipo))];
   const todosLosKPIs = [...new Set(data.map(d => d.KPI))];
 
-  // Lógica para la Tabla Histórica y la Gráfica (Filtra hasta el mes seleccionado)
   const getMesesHistoricosArr = () => {
     const sortedAll = mesesConDatosGlobal.sort((a, b) => parseMesToSortable(a).localeCompare(parseMesToSortable(b)));
     const sortableSelected = parseMesToSortable(mesBase);
@@ -119,12 +115,11 @@ export default function PostventaDashboard() {
   const mesesHistoricosArr = getMesesHistoricosArr();
   const agenciaHistoricaNombre = selectedAgencia === 'Todas' ? 'Consolidado Grupo' : selectedAgencia;
 
-  // Datos para la Gráfica
   const chartData = mesesHistoricosArr.map(m => ({
     mes: m,
     valor: getVal(m, selectedCategory, selectedAgencia, kpiGrafica)
   }));
-  const maxChartVal = Math.max(...chartData.map(d => d.valor), 1); // Evita división por cero
+  const maxChartVal = Math.max(...chartData.map(d => d.valor), 1);
 
   return (
     <div className="flex flex-col xl:flex-row min-h-screen bg-[#F1F5F9] font-sans text-gray-800 antialiased">
@@ -141,7 +136,7 @@ export default function PostventaDashboard() {
             <label className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase mb-3 tracking-wider"><Calendar size={14} className="text-[#003366]" /> 1. Mes de Análisis</label>
             <select className="w-full p-3 bg-white border border-gray-300 rounded-lg text-sm font-bold text-[#003366] shadow-sm outline-none hover:border-[#003366] transition-colors cursor-pointer"
               value={mesBase} onChange={e => setMesBase(e.target.value)}>
-              {mesSelectores.map(m => <option key={m} value={m}>{m}</option>)}
+              {mesesSelectores.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
 
@@ -308,20 +303,17 @@ export default function PostventaDashboard() {
               </div>
             </div>
 
-            {/* LA GRÁFICA (Puro Tailwind, sin librerías) */}
+            {/* LA GRÁFICA */}
             <div className="p-8 border-b border-gray-100 bg-[#F8FAFC]/50">
               <div className="h-48 flex items-end gap-2 md:gap-4">
                 {chartData.map((d, i) => (
                   <div key={i} className="flex-1 flex flex-col items-center group relative h-full justify-end">
-                    {/* Tooltip flotante al pasar el mouse */}
                     <div className="opacity-0 group-hover:opacity-100 absolute -top-12 bg-[#002244] text-white text-xs font-bold py-1.5 px-3 rounded shadow-lg pointer-events-none transition-all whitespace-nowrap z-20">
                       {d.mes}: {formatMoney(d.valor, kpiGrafica)}
                     </div>
-                    {/* Barra */}
                     <div className="w-full bg-[#93C5FD] group-hover:bg-[#003366] transition-colors rounded-t-md relative"
                       style={{ height: `${Math.max((d.valor / maxChartVal) * 100, 1)}%` }}>
                     </div>
-                    {/* Etiqueta del mes (rotada para móviles, recta para PC) */}
                     <span className="text-[10px] sm:text-xs font-bold text-gray-400 mt-3 whitespace-nowrap">{d.mes}</span>
                   </div>
                 ))}
